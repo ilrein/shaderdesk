@@ -88,7 +88,7 @@ struct LivePreview: NSViewRepresentable {
 
 // MARK: - Model
 
-/// Bridges Settings + the scene catalog into SwiftUI.
+/// Bridges the scene catalog and the selected scene into SwiftUI.
 final class GalleryModel: ObservableObject {
     struct Item: Identifiable {
         let scene: Scene
@@ -99,7 +99,6 @@ final class GalleryModel: ObservableObject {
 
     @Published private(set) var items: [Item] = []
     @Published private(set) var current: String = ""
-    @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
     let settings = Settings.shared
     private let controller: WallpaperController
     private var thumbs: [String: (Date, NSImage)] = [:] // path -> (mtime, image)
@@ -109,7 +108,8 @@ final class GalleryModel: ObservableObject {
         self.controller = controller
         let nc = NotificationCenter.default
         observers.append(nc.addObserver(forName: Settings.didChange, object: nil, queue: .main) { [weak self] _ in
-            self?.syncSettings()
+            guard let self else { return }
+            self.current = self.controller.scene.id
         })
         observers.append(nc.addObserver(forName: WallpaperController.scenesDidChange, object: nil, queue: .main) { [weak self] _ in
             self?.refresh()
@@ -119,66 +119,27 @@ final class GalleryModel: ObservableObject {
 
     deinit { observers.forEach(NotificationCenter.default.removeObserver) }
 
-    private func syncSettings() {
-        objectWillChange.send()
-        current = controller.scene.id
-    }
-
     /// Rebuilds the list; thumbnails are re-rendered only for files that changed.
     func refresh() {
         let fm = FileManager.default
         items = controller.scenes.map { s in
             let mtime = (try? fm.attributesOfItem(atPath: s.url.path)[.modificationDate] as? Date) ?? .distantPast
             var thumb = thumbs[s.url.path].flatMap { $0.0 == mtime ? $0.1 : nil }
-            if thumb == nil, let cg = Preview.image(s, pixelWidth: 640) {
-                thumb = NSImage(cgImage: cg, size: NSSize(width: 320, height: 200))
+            if thumb == nil, let cg = Preview.image(s, pixelWidth: 720) {
+                thumb = NSImage(cgImage: cg, size: NSSize(width: 360, height: 225))
                 thumbs[s.url.path] = (mtime, thumb!)
             }
             return Item(scene: s, thumbnail: thumb, error: GPU.shared.error(for: s).map { ($0 as NSError).localizedDescription })
         }
         current = controller.scene.id
-        launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
     func select(_ s: Scene) { settings.scene = s.id }
-    func reload() { controller.reloadScenes() }
-    var screenNames: [String] { controller.screenNames }
-
-    func setLaunchAtLogin(_ on: Bool) {
-        do { try AppActions.setLaunchAtLogin(on) } catch { AppActions.alert("Couldn't change the login item", error) }
-        launchAtLogin = SMAppService.mainApp.status == .enabled
-    }
-
-    /// Two-way binding to a Settings property.
-    func binding<T>(_ key: ReferenceWritableKeyPath<Settings, T>) -> Binding<T> {
-        Binding(get: { self.settings[keyPath: key] }, set: { self.settings[keyPath: key] = $0 })
-    }
 }
 
 enum AppActions {
-    static func openScenesFolder() {
-        let dir = SceneCatalog.userDirectory
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        // seed the folder with the built-in scenes as examples to copy from
-        if let builtIn = SceneCatalog.builtInDirectory {
-            let examples = dir.appendingPathComponent("Examples")
-            try? FileManager.default.removeItem(at: examples)
-            try? FileManager.default.copyItem(at: builtIn, to: examples)
-        }
-        NSWorkspace.shared.open(dir)
-    }
-
     static func setLaunchAtLogin(_ on: Bool) throws {
         if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-    }
-
-    static func showError(_ sceneTitle: String, _ message: String) {
-        let a = NSAlert()
-        a.messageText = "\(sceneTitle) doesn't compile"
-        a.informativeText = message
-        a.addButton(withTitle: "OK")
-        a.addButton(withTitle: "Open Scenes Folder")
-        if a.runModal() == .alertSecondButtonReturn { openScenesFolder() }
     }
 
     static func alert(_ title: String, _ error: Error) {
@@ -191,28 +152,27 @@ enum AppActions {
 
 // MARK: - Views
 
-struct GalleryView: View {
+/// The whole UI: every scene as a big thumbnail. Click one and it's the wallpaper.
+struct PickerView: View {
     @ObservedObject var model: GalleryModel
-    private let columns = [GridItem(.adaptive(minimum: 260, maximum: 340), spacing: 18)]
+    private let columns = [GridItem(.fixed(CardSize.width), spacing: 14), GridItem(.fixed(CardSize.width), spacing: 14)]
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 18) {
-                    ForEach(model.items) { item in
-                        SceneCard(item: item, selected: item.id == model.current) {
-                            if let err = item.error { AppActions.showError(item.scene.title, err) } else { model.select(item.scene) }
-                        }
-                    }
-                    AddSceneCard()
+        LazyVGrid(columns: model.items.count > 1 ? columns : [columns[0]], spacing: 14) {
+            ForEach(model.items) { item in
+                SceneCard(item: item, selected: item.id == model.current) {
+                    if item.error == nil { model.select(item.scene) }
                 }
-                .padding(20)
             }
-            Divider()
-            SettingsBar(model: model)
         }
-        .frame(minWidth: 620, minHeight: 460)
+        .padding(16)
+        .fixedSize()
     }
+}
+
+enum CardSize {
+    static let width: CGFloat = 300
+    static let height: CGFloat = width * 900 / 1440
 }
 
 struct SceneCard: View {
@@ -223,166 +183,76 @@ struct SceneCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                ZStack {
-                    Color.black
-                    if hovering && item.error == nil {
-                        LivePreview(scene: item.scene)
-                    } else if let t = item.thumbnail {
-                        Image(nsImage: t).resizable().interpolation(.high)
-                    } else {
-                        VStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle").font(.title2)
-                            Text("Doesn't compile").font(.caption)
-                        }
-                        .foregroundStyle(.secondary)
+            ZStack(alignment: .bottomLeading) {
+                Color.black
+                if hovering && item.error == nil {
+                    LivePreview(scene: item.scene)
+                } else if let t = item.thumbnail {
+                    Image(nsImage: t).resizable().interpolation(.high)
+                } else {
+                    VStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle").font(.title2)
+                        Text("Doesn't compile").font(.caption)
                     }
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .aspectRatio(1440.0 / 900.0, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: selected ? 3 : 1)
-                )
-                .overlay(alignment: .topTrailing) {
-                    if selected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title3)
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, Color.accentColor)
-                            .padding(8)
-                    }
-                }
-
+                LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .center, endPoint: .bottom)
+                    .allowsHitTesting(false)
                 HStack(spacing: 6) {
-                    Text(item.scene.title).font(.headline)
-                    if !item.scene.builtIn {
-                        Text("Custom")
-                            .font(.caption2.weight(.medium))
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(Capsule().fill(Color.accentColor.opacity(0.18)))
-                    }
+                    Text(item.scene.title).font(.system(size: 13, weight: .semibold))
                     Spacer()
-                    if item.scene.showsLabels {
-                        Image(systemName: "chart.dots.scatter").foregroundStyle(.secondary)
-                            .help("Shows project galaxies and names from agent activity")
-                    }
+                    if selected { Image(systemName: "checkmark.circle.fill").font(.system(size: 14)) }
                 }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10).padding(.vertical, 8)
             }
+            .frame(width: CardSize.width, height: CardSize.height)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(selected ? Color.accentColor : Color.white.opacity(hovering ? 0.35 : 0.1),
+                                  lineWidth: selected ? 2.5 : 1)
+            )
+            .scaleEffect(hovering ? 1.015 : 1)
+            .animation(.easeOut(duration: 0.15), value: hovering)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(item.error ?? "Use \(item.scene.title) as the wallpaper")
+        .help(item.error ?? item.scene.title)
     }
 }
 
-/// Last card: where to put your own scenes.
-struct AddSceneCard: View {
-    var body: some View {
-        Button(action: AppActions.openScenesFolder) {
-            VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-                    .foregroundStyle(.secondary.opacity(0.6))
-                    .aspectRatio(1440.0 / 900.0, contentMode: .fit)
-                    .overlay {
-                        VStack(spacing: 6) {
-                            Image(systemName: "plus").font(.title2)
-                            Text("Add a .metal scene").font(.callout)
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                Text("Your Scenes Folder").font(.headline).foregroundStyle(.secondary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("Opens ~/Library/Application Support/Shaderdesk/Scenes. Files you save there show up here.")
+// MARK: - Popover
+
+/// Shown from the menu bar icon. Live previews only run for the hovered card.
+final class PickerPopover: NSObject {
+    private let popover = NSPopover()
+    private let model: GalleryModel
+
+    init(controller: WallpaperController) {
+        model = GalleryModel(controller: controller)
+        super.init()
+        popover.behavior = .transient
+        popover.animates = true
+        let host = NSHostingController(rootView: PickerView(model: model))
+        host.sizingOptions = .preferredContentSize
+        popover.contentViewController = host
     }
-}
 
-struct SettingsBar: View {
-    @ObservedObject var model: GalleryModel
+    var isShown: Bool { popover.isShown }
 
-    var body: some View {
-        let s = model.settings
-        HStack(alignment: .center, spacing: 18) {
-            Toggle("Agent activity", isOn: model.binding(\.dataLayer))
-            Toggle("Counters", isOn: model.binding(\.showCounters)).disabled(!s.dataLayer)
-            Toggle("Project names", isOn: model.binding(\.showLabels)).disabled(!s.dataLayer)
-            if model.screenNames.count > 1 {
-                Picker("Counters on", selection: model.binding(\.countersDisplay)) {
-                    Text("Main Display").tag("")
-                    ForEach(model.screenNames, id: \.self) { Text($0).tag($0) }
-                }
-                .fixedSize()
-                .disabled(!s.dataLayer || !s.showCounters)
-            }
-            Spacer(minLength: 0)
+    func show(from button: NSStatusBarButton) {
+        model.refresh()
+        // size up front, so the popover is placed for its final size under the icon
+        if let view = popover.contentViewController?.view {
+            view.layoutSubtreeIfNeeded()
+            popover.contentSize = view.fittingSize
         }
-        .toggleStyle(.checkbox)
-        .padding(.horizontal, 20).padding(.top, 12)
-
-        HStack(spacing: 18) {
-            Picker("Frame rate", selection: model.binding(\.fps)) {
-                ForEach([15, 20, 30, 60], id: \.self) { Text("\($0) fps").tag($0) }
-            }
-            .fixedSize()
-            Picker("Brightness", selection: model.binding(\.brightness)) {
-                Text("Dim").tag(0.7); Text("Normal").tag(1.0); Text("Bright").tag(1.35)
-            }
-            .fixedSize()
-            Picker("Motion", selection: model.binding(\.driftSpeed)) {
-                Text("Still").tag(0.0); Text("Slow").tag(1.0); Text("Faster").tag(3.0)
-            }
-            .fixedSize()
-            Spacer(minLength: 0)
-            Toggle("Pause", isOn: model.binding(\.paused)).toggleStyle(.checkbox)
-            Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                .toggleStyle(.checkbox)
-        }
-        .padding(.horizontal, 20).padding(.vertical, 12)
-    }
-}
-
-// MARK: - Window
-
-/// The app's window. Opening it makes Shaderdesk a regular app (Dock icon, menu bar,
-/// Cmd-Tab); closing it goes back to living only in the menu bar.
-final class GalleryWindowController: NSObject, NSWindowDelegate {
-    private var window: NSWindow?
-    private let controller: WallpaperController
-    private var model: GalleryModel?
-
-    init(controller: WallpaperController) { self.controller = controller }
-
-    func show() {
-        if window == nil {
-            let model = GalleryModel(controller: controller)
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1020, height: 680),
-                             styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                             backing: .buffered, defer: false)
-            w.title = "Shaderdesk"
-            w.contentView = NSHostingView(rootView: GalleryView(model: model))
-            w.isReleasedWhenClosed = false
-            w.delegate = self
-            w.setFrameAutosaveName("ShaderdeskGallery")
-            if !w.setFrameUsingName("ShaderdeskGallery") { w.center() }
-            window = w
-            self.model = model
-        } else {
-            model?.refresh()
-        }
-        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
-    func windowWillClose(_ notification: Notification) {
-        // drop the window (and its live previews); back to a menu-bar-only app
-        window = nil
-        model = nil
-        NSApp.setActivationPolicy(.accessory)
-    }
+    func close() { popover.performClose(nil) }
 }

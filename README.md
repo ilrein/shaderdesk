@@ -34,17 +34,11 @@ scripts/build-app.sh --install  # also copy to /Applications and launch
 For development, run `swift run Shaderdesk`. Set `SHADERDESK_DEBUG=1` to log
 pause/resume events and per-display frame stats to stderr.
 
-## Menu
+## Using it
 
-| Item | |
-| --- | --- |
-| Scene | Pick a scene, open the scenes folder, reload (⌘R) |
-| Agent Activity | Optional, off by default: exposes Claude Code / Codex activity to scenes |
-| Show Counters / Counters On | Projects · agents · tokens today, on the display you choose |
-| Frame Rate / Brightness / Motion | 15–60 fps, brightness, how fast scenes move |
-| Pause / Launch at Login | |
-
-At the bottom of the menu, each display shows its resolution, fps and GPU time per frame.
+Click the menu bar icon: every scene is shown as a thumbnail (hover to see it move).
+Click one and it becomes the wallpaper. Right-click the icon for Launch at Login and
+Quit. That's all there is.
 
 ## Writing a scene
 
@@ -53,8 +47,7 @@ Scenes live in two places:
 - built-in: `Scenes/` in this repo, copied into the app bundle
 - yours: `~/Library/Application Support/Shaderdesk/Scenes/`
 
-"Open Scenes Folder" in the menu opens your folder and copies the built-in scenes into
-`Examples/` for reference. A file in your folder with the same name as a built-in scene
+A file in your folder with the same name as a built-in scene
 replaces it. The folder is watched, so saving a file reloads it.
 
 Each file is compiled on its own, with [`Scenes/Common.metal`](Scenes/Common.metal)
