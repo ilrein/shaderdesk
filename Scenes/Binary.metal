@@ -36,7 +36,7 @@ inline Sys sysFor(constant Uniforms& U) {
     s.db = s.da * 0.30;
     s.dtilt = -0.16;
     float2 dir = normalize(s.cc - s.dc);
-    s.tip = s.dc + dir * s.dr * 1.24;
+    s.tip = s.dc + dir * s.dr * 1.25;   // just inside DONOR_TIP
     float c = cos(s.dtilt), sn = sin(s.dtilt);
     // lands on the near-left rim of the disk
     float2 rim = float2(-0.80 * s.da, -0.62 * s.db);
@@ -89,7 +89,7 @@ inline float flow2(texture2d<float> nt, sampler s, float2 uv, float2 vel, float 
 
 // distance from p to the quadratic bezier (a, c, b), and the curve parameter there
 inline float2 bezierDist(float2 p, float2 a, float2 c, float2 b) {
-    float best = 1e9, bs = 0.0;
+    float best = 1e9, bs = 0.0, sg = 1.0;
     float2 prev = a;
     for (int i = 1; i <= 24; i++) {
         float s = float(i) / 24.0;
@@ -100,7 +100,19 @@ inline float2 bezierDist(float2 p, float2 a, float2 c, float2 b) {
         if (d < best) { best = d; bs = (float(i - 1) + h) / 24.0; }
         prev = q;
     }
-    return float2(best, bs);
+    return float2(best * sg, bs);   // signed distance, curve parameter
+}
+
+// donor shape in units of its radius: a sphere, tidally stretched along A (the axis to
+// the companion) into a rounded teardrop. Approximate distance (Lipschitz < 1.25).
+constant float DONOR_TIP = 1.26;
+inline float donorR(float c) {
+    return 1.0 + 0.06 * c * c + 0.20 * pow(saturate(c), 6.0);
+}
+inline float donorSDF(float3 p, float3 A) {
+    float l = length(p);
+    float c = dot(p, A) / max(l, 1e-5);
+    return (l - donorR(c)) * 0.85;
 }
 
 fragment float4 scene_frame(VOut in [[stage_in]],
@@ -125,41 +137,66 @@ fragment float4 scene_frame(VOut in [[stage_in]],
     float tw = vnoise(pt * 0.09 + float2(U.view.w * 0.4, -U.view.w * 0.27));
     col += float3(0.92, 0.95, 1.0) * bk.a * (0.8 + 0.2 * tw);
 
-    // ---- giant (teardrop toward the companion)
+    // ---- giant: a 3D teardrop (tidally stretched toward the companion), ray-marched so
+    // the silhouette, shading and surface texture all follow the same shape
     float2 dirC = normalize(S.cc - S.dc);
-    float2 q = pt - S.dc;
-    float dq = length(q);
-    float ang = dot(q / max(dq, 1e-3), dirC);
-    float Rth = S.dr * (1.0 + 0.22 * pow(saturate(ang), 12.0) + 0.03 * ang);   // pulled out toward the tip
-    float x = dq / Rth;
-    // glow around it
-    col += float3(1.0, 0.45, 0.14) * 0.10 * exp(-max(x - 1.0, 0.0) * 5.0) * step(1.0, x);
-    col += float3(1.0, 0.40, 0.12) * 0.04 * exp(-max(x - 1.0, 0.0) * 1.4) * step(1.0, x);
-    if (x < 1.0 + 2.0 * px / S.dr) {
-        float2 u2 = q / Rth;
-        float z = sqrt(max(1.0 - dot(u2, u2), 0.0));
-        float lon = atan2(u2.x, z) + t * (2.0 * XPI / 1800.0);
-        float lat = asin(clamp(u2.y, -1.0, 1.0));
-        float2 suv = float2(lon / (2.0 * XPI) * 3.0, lat / XPI * 1.8);
-        float g1 = flow2(bg, rep, suv, float2(0.0009, 0.0003), 120.0, t, 0);
-        float g2 = flow2(bg, rep, suv * 3.1, float2(-0.0016, 0.0008), 60.0, t, 1);
-        float gran = g1 * 0.6 + g2 * 0.4;
-        // molten veins: ridges of the flowing noise
-        float v1 = 1.0 - abs(2.0 * g1 - 1.0), v2 = 1.0 - abs(2.0 * g2 - 1.0);
-        float veins = pow(v1, 6.0) * 0.8 + pow(v2, 9.0) * 0.5;
-        float heat = 0.52 + 0.6 * (gran - 0.5) + 0.32 * veins;
-        float limb = pow(z, 0.55);
-        // irradiated by the companion: the facing hemisphere is hotter
-        float face = saturate(dot(float3(u2, z), normalize(float3(dirC, 0.35))));
-        float h = heat * (0.52 + 0.48 * limb) * (1.0 + 0.35 * face * face);
-        float3 surf = amberRamp(h) * 0.85;
-        surf += float3(1.0, 0.55, 0.2) * pow(1.0 - z, 3.0) * 0.6;       // hot rim
-        // glossy highlight, upper left
-        float3 Nn = float3(u2, z);
-        float3 Hh = normalize(float3(-0.45, 0.55, 1.0) + float3(0, 0, 1));
-        surf += float3(1.0, 0.85, 0.6) * pow(saturate(dot(Nn, Hh)), 10.0) * 0.10;
-        float a = saturate((1.0 - x) * S.dr / px + 0.5);
-        col = mix(col, surf, a);
+    float3 A = float3(dirC, 0.0);
+    float2 p2 = (pt - S.dc) / S.dr;
+    const float BOUND = 1.34;
+    float pr = dot(p2, p2);
+    {
+        // the outline of a surface of revolution about an in-plane axis is its profile,
+        // so the glow can use the exact 2D distance to it (no ray-march needed)
+        float l2 = sqrt(pr);
+        float edge = l2 - donorR(dot(p2 / max(l2, 1e-5), dirC));
+        float gd = max(edge, 0.0);
+        float out = smoothstep(-2.0 * px / S.dr, 0.0, edge);
+        col += float3(1.0, 0.45, 0.14) * 0.10 * exp(-gd * 5.0) * out;
+        col += float3(1.0, 0.40, 0.12) * 0.04 * exp(-gd * 1.4) * out;
+    }
+    if (pr < BOUND * BOUND) {
+        float gmin = 1e3;
+        float3 hitP = float3(0.0);
+        bool hit = false;
+        {
+            float z = sqrt(BOUND * BOUND - pr);
+            for (int i = 0; i < 40; i++) {
+                float3 P3 = float3(p2, z);
+                float g = donorSDF(P3, A);
+                gmin = min(gmin, g);
+                if (g < 0.0004) { hit = true; hitP = P3; break; }
+                z -= max(g * 0.8, 0.002);
+                if (z < -BOUND) break;
+            }
+        }
+        if (hit || gmin * S.dr < 2.0 * px) {
+            float3 P3 = hit ? hitP : float3(p2, 0.0);
+            const float e = 0.002;
+            float3 N = normalize(float3(
+                donorSDF(P3 + float3(e, 0, 0), A) - donorSDF(P3 - float3(e, 0, 0), A),
+                donorSDF(P3 + float3(0, e, 0), A) - donorSDF(P3 - float3(0, e, 0), A),
+                donorSDF(P3 + float3(0, 0, e), A) - donorSDF(P3 - float3(0, 0, e), A)));
+            float3 d3 = normalize(P3);
+            float lon = atan2(d3.x, d3.z) + t * (2.0 * XPI / 1800.0);
+            float lat = asin(clamp(d3.y, -1.0, 1.0));
+            float2 suv = float2(lon / (2.0 * XPI) * 3.0, lat / XPI * 1.8);
+            float g1 = flow2(bg, rep, suv, float2(0.0009, 0.0003), 120.0, t, 0);
+            float g2 = flow2(bg, rep, suv * 3.1, float2(-0.0016, 0.0008), 60.0, t, 1);
+            float gran = g1 * 0.6 + g2 * 0.4;
+            float v1 = 1.0 - abs(2.0 * g1 - 1.0), v2 = 1.0 - abs(2.0 * g2 - 1.0);
+            float veins = pow(v1, 6.0) * 0.8 + pow(v2, 9.0) * 0.5;
+            float heat = 0.52 + 0.6 * (gran - 0.5) + 0.30 * veins;
+            float mu = saturate(N.z);
+            float limb = pow(mu, 0.55);
+            float face = saturate(dot(N, normalize(float3(dirC, 0.35))));
+            float h = heat * (0.50 + 0.50 * limb) * (1.0 + 0.35 * face * face);
+            float3 surf = amberRamp(h) * 0.85;
+            surf += float3(1.0, 0.55, 0.2) * pow(1.0 - mu, 3.0) * 0.6;          // hot rim
+            surf += float3(1.0, 0.85, 0.6) * pow(saturate(dot(N, normalize(float3(-0.3, 0.4, 1.6)))), 10.0) * 0.10;
+            // antialias the silhouette: rays that just miss get partial coverage
+            float a = hit ? 1.0 : saturate(0.5 - gmin * S.dr / px);
+            col = mix(col, surf, a);
+        }
     }
 
     // ---- stream
@@ -167,11 +204,16 @@ fragment float4 scene_frame(VOut in [[stage_in]],
     if (all(pt > bmin) && all(pt < bmax)) {
         float2 bd = bezierDist(pt, S.tip, S.ctrl, S.hit);
         float s = bd.y;
+        float sd = bd.x;
+        bd.x = abs(sd);
         float w = H * mix(0.006, 0.020, s);
-        float along = s * 3.0 - t * 0.035;                        // gas flows toward the disk
-        float n1 = bg.sample(rep, float2(along, bd.x / H * 6.0 + 0.3)).r;
-        float n2 = bg.sample(rep, float2(along * 2.3 + 0.4, bd.x / H * 9.0)).g;
-        float clumps = saturate(0.35 + 1.4 * (n1 - 0.5) + 0.9 * (n2 - 0.5) + 0.5);
+        float L = length(S.hit - S.tip) * 1.1;
+        // streaks run along the flow: long in the flow direction, short across it,
+        // and the across coordinate scales with the widening stream
+        float2 fuv = float2((s * L) / (H * 0.9) - t / 120.0, sd / w * 0.10);
+        float n1 = bg.sample(rep, fuv + 0.3).r;
+        float n2 = bg.sample(rep, fuv * float2(2.1, 1.7) + float2(0.4, 0.1)).g;
+        float clumps = saturate(0.55 + 1.1 * (n1 - 0.5) + 0.6 * (n2 - 0.5));
         float core = exp(-pow(bd.x / w, 2.0));
         float haze = exp(-bd.x / (w * 3.5)) * smoothstep(H * 0.11, H * 0.04, bd.x);   // zero before the bbox edge
         float3 hot = mix(float3(1.0, 0.42, 0.12), float3(1.0, 0.78, 0.40), smoothstep(0.1, 0.55, s));
@@ -207,7 +249,7 @@ fragment float4 scene_frame(VOut in [[stage_in]],
 
     col += starGlow;
 
-    if (rd < 1.02) {
+    if (rd < 1.35) {
         float r = rd;
         float om = 2.0 * XPI / 90.0 * pow(max(r, 0.12), -1.5) * 0.35;
         float lr = log(max(r, 0.05));
@@ -215,10 +257,9 @@ fragment float4 scene_frame(VOut in [[stage_in]],
                              float2(-om / (2.0 * XPI) * 2.0 * 0.2, 0.0), 30.0, t, 0);
         float fine = flow2(bg, rep, float2(phi / (2.0 * XPI) * 6.0, lr * 4.0), float2(-0.01, 0.0), 20.0, t, 2);
         float dens = saturate(0.45 + 1.2 * (spiral - 0.5) + 0.6 * (fine - 0.5));
-        dens *= smoothstep(0.10, 0.20, r) * smoothstep(1.02, 0.80, r);
+        dens *= smoothstep(0.10, 0.20, r) * smoothstep(1.03, 0.82, r);
         float T = pow(max(r, 0.12) / 0.2, -1.1);
         float3 e = diskRamp(0.95 * T * (0.6 + 0.8 * dens)) * dens * 1.3;
-        e += float3(0.6, 0.75, 1.0) * exp(-pow((r - 1.0) / 0.05, 2.0)) * 0.15;   // lit rim
         // hot spot where the stream lands, flickering
         float2 hp = float2(-0.80, -0.62 / 1.0);
         float hs = exp(-dot(dp - hp * float2(1.0, 1.0), dp - hp) * 30.0);
@@ -226,7 +267,7 @@ fragment float4 scene_frame(VOut in [[stage_in]],
         e += float3(1.0, 0.9, 0.8) * hs * 1.6 * fl;
         float alpha = saturate(dens * 1.4) * 0.85;
         // the near half of the disk passes in front of the star's glow
-        float occl = front ? alpha : 0.0;
+        float occl = alpha * smoothstep(0.08, -0.08, dp.y);
         col = (col - starGlow * occl * 0.6) * (1.0 - alpha * 0.6) + e;
     }
     col = mix(col, float3(3.0, 3.2, 3.6), starCore * (front && rd < 0.5 ? 0.4 : 1.0));
