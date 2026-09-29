@@ -4,6 +4,12 @@ Live Metal shader wallpapers for macOS, from the menu bar. Built-in scenes:
 
 - **Red Giant**: a molten, boiling star with streaming corona rays, prominences rising
   off the limb and a planet transiting in front of it.
+- **Black Hole**: a ray-traced Schwarzschild black hole. Every pixel's light path is
+  integrated through curved spacetime, so the lensed far side of the accretion disk,
+  the photon ring and the Einstein-ring sky come out of the physics.
+
+Every scene renders in HDR and goes through a shared bloom pass (a mip-pyramid lens
+glow) before tone mapping; set its strength per scene with `//! bloom: 0.06`.
 
 - **Native and light.** Swift + Metal, about 5% of one CPU core and a few ms of GPU per
   frame at full Retina resolution on two displays. The app is under 1 MB.

@@ -1,4 +1,5 @@
 //! title: Icon
+//! bloom: 0
 //
 // The app icon artwork. Not a wallpaper scene (it lives outside Scenes/), rendered by
 // scripts/make-icon.sh via `Shaderdesk --snapshot --scene-file Art/Icon.metal`.

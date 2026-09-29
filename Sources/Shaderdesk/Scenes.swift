@@ -9,11 +9,13 @@ import Foundation
 ///     //! title: Red Giant
 ///     //! order: 0
 ///     //! labels: true      (draws project galaxies, so show their names)
+///     //! bloom: 0.06       (strength of the lens glow added in post; default 0.06)
 struct Scene: Equatable {
     let id: String
     let title: String
     let order: Int
     let showsLabels: Bool
+    var bloom: Float = 0.06
     let url: URL
     let builtIn: Bool
 }
@@ -60,6 +62,7 @@ enum SceneCatalog {
                          title: meta["title"] ?? (name as NSString).deletingPathExtension,
                          order: Int(meta["order"] ?? "") ?? 100,
                          showsLabels: meta["labels"] == "true",
+                         bloom: Float(meta["bloom"] ?? "") ?? 0.06,
                          url: url, builtIn: builtIn)
         }
     }

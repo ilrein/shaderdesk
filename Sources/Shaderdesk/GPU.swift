@@ -92,7 +92,9 @@ final class GPU {
         guard let prelude = SceneCatalog.preludeURL else { throw GPUError.noPrelude }
         let src = try String(contentsOf: prelude, encoding: .utf8) + "\n\n#line 1 \"\(scene.url.lastPathComponent)\"\n"
             + String(contentsOf: scene.url, encoding: .utf8)
-        let lib = try device.makeLibrary(source: src, options: nil) // fast math is the default
+        let opts = MTLCompileOptions() // fast math is the default
+        opts.preprocessorMacros = ["SD_HDR": NSNumber(value: 1)]
+        let lib = try device.makeLibrary(source: src, options: opts)
         guard let vf = lib.makeFunction(name: "fullscreen_vertex") else { throw GPUError.noFunction("fullscreen_vertex") }
         guard let ff = lib.makeFunction(name: "scene_frame") else { throw GPUError.noFunction("scene_frame") }
 
@@ -104,7 +106,7 @@ final class GPU {
             desc.colorAttachments[0].pixelFormat = format
             return try device.makeRenderPipelineState(descriptor: desc)
         }
-        return ScenePipelines(frame: try make(ff, GPU.frameFormat),
+        return ScenePipelines(frame: try make(ff, Post.hdrFormat),
                               bake: try lib.makeFunction(name: "scene_bake").map { try make($0, GPU.bakeFormat) },
                               lut: try lib.makeFunction(name: "scene_lut").map { try make($0, GPU.bakeFormat) })
     }

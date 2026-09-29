@@ -45,7 +45,9 @@ enum Snapshot {
         let adHoc = value(args, "--scene-file").map { path -> Scene in
             let url = URL(fileURLWithPath: path)
             return Scene(id: url.deletingPathExtension().lastPathComponent.lowercased(), title: "adhoc",
-                         order: 0, showsLabels: false, url: url, builtIn: false)
+                         order: 0, showsLabels: false,
+                         bloom: Float(SceneCatalog.metadata((try? String(contentsOf: url, encoding: .utf8)) ?? "")["bloom"] ?? "") ?? 0.06,
+                         url: url, builtIn: false)
         }
         guard let scene = adHoc ?? scenes.first(where: { $0.id == sceneID }) else {
             print("unknown scene \(sceneID); have: \(scenes.map(\.id).joined(separator: ", "))")

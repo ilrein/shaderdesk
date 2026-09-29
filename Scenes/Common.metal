@@ -181,6 +181,12 @@ inline float3 srgbDecode(float3 c) {
 /// (Dithering in linear space would be amplified ~10x near black by the sRGB curve,
 /// which shows up as static.) The pattern is fixed per pixel, so it never shimmers.
 inline float4 present(float3 hdr, float2 px) {
+#ifdef SD_HDR
+    // the app renders scenes into an HDR buffer; bloom, tone mapping and dithering
+    // happen in the post pass (Sources/Shaderdesk/Post.swift)
+    hdr = select(hdr, float3(0.0), isnan(hdr));
+    return float4(clamp(hdr, 0.0, 6.0e4), 1.0);
+#endif
     float3 s = srgbEncode(tonemap(hdr));
     float n = fract(52.9829189 * fract(dot(floor(px), float2(0.06711056, 0.00583715)))) - 0.5; // interleaved gradient noise
     s = saturate(s + n / 255.0);

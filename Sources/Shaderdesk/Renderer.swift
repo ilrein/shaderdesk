@@ -6,6 +6,8 @@ import Metal
 /// adds the live elements.
 final class Renderer {
     static let margin: CGFloat = 56
+    /// SHADERDESK_BLOOM=x overrides every scene's bloom strength (for tuning)
+    static let bloomOverride = ProcessInfo.processInfo.environment["SHADERDESK_BLOOM"].flatMap(Float.init)
 
     let display: CGRect // global points
     let seed: Float
@@ -16,6 +18,7 @@ final class Renderer {
     private var bakeTex: MTLTexture?
     private var bakeRect = CGRect.zero
     private var bakeScale: Float = 0
+    private let post = PostChain()
 
     init(display: CGRect, scene: Scene, seed: Float) {
         self.display = display
@@ -39,7 +42,9 @@ final class Renderer {
             } else {
                 lutTex = nil
             }
-            frame(cb, pipeline: p.frame, target: target, pxPerPt: pxPerPt, world: world)
+            guard let hdr = post.hdrTexture(width: target.width, height: target.height) else { return }
+            frame(cb, pipeline: p.frame, target: hdr, pxPerPt: pxPerPt, world: world)
+            post.resolve(cb, target: target, strength: Renderer.bloomOverride ?? scene.bloom)
         case .failure:
             clear(cb, target: target) // the menu shows the compile error
         }
