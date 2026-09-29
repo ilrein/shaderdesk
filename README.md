@@ -11,6 +11,8 @@ Live Metal shader wallpapers for macOS, from the menu bar. Built-in scenes:
 - **Black Hole**: a ray-traced Schwarzschild black hole. Every pixel's light path is
   integrated through curved spacetime, so the lensed far side of the accretion disk,
   the photon ring and the Einstein-ring sky come out of the physics.
+- **Neon Horizon**: synthwave in hot pink and cyan. A striped sun sinking between
+  rim-lit mountain ridges, and a neon grid scrolling across a wet floor that mirrors it all.
 
 Every scene renders in HDR and goes through a shared bloom pass (a mip-pyramid lens
 glow) before tone mapping; set its strength per scene with `//! bloom: 0.06`. `//! tags: Stars, Planets` groups
