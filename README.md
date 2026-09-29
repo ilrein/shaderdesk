@@ -6,6 +6,8 @@ Live Metal shader wallpapers for macOS, from the menu bar. Built-in scenes:
   off the limb and a planet transiting in front of it.
 - **Ringed World**: a banded gas giant backlit by its star, with rings that cast
   shadows on it (and catch its shadow), ice glints, and a moon that slips into eclipse.
+- **Binary**: an amber giant stretched into a teardrop, spilling a stream of gas onto a
+  white-hot companion's spinning accretion disk, with a flickering hot spot and faint jets.
 - **Black Hole**: a ray-traced Schwarzschild black hole. Every pixel's light path is
   integrated through curved spacetime, so the lensed far side of the accretion disk,
   the photon ring and the Einstein-ring sky come out of the physics.
