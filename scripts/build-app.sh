@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Shaderdesk.app into ./build.   --install  also copies it to /Applications and relaunches it.
+# Builds Shaderdesk.app into ./build.   --install  also copies it to /Applications (or ~/Applications) and relaunches it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -39,8 +39,10 @@ echo "built $APP"
 if [[ "${1:-}" == "--install" ]]; then
   pkill -x Shaderdesk 2>/dev/null || true
   sleep 0.5
-  rm -rf /Applications/Shaderdesk.app
-  cp -R "$APP" /Applications/Shaderdesk.app
-  open /Applications/Shaderdesk.app
-  echo "installed and launched /Applications/Shaderdesk.app"
+  DEST=/Applications
+  [[ -w "$DEST" ]] || { DEST="$HOME/Applications"; mkdir -p "$DEST"; }   # non-admin accounts can't write /Applications
+  rm -rf "$DEST/Shaderdesk.app"
+  cp -R "$APP" "$DEST/Shaderdesk.app"
+  open "$DEST/Shaderdesk.app"
+  echo "installed and launched $DEST/Shaderdesk.app"
 fi
