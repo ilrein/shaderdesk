@@ -50,4 +50,8 @@ scripts/render-previews.sh myscene   # -> docs/previews/myscene.{mp4,jpg}
 Keep PRs focused, and describe what you checked (displays, performance, macOS version).
 `swift build -c release` must pass. Open an issue first for bigger changes to the app itself.
 
+The app has to build with only the Command Line Tools (no Xcode), so don't use SwiftUI macros such as
+`@State`, `@Entry`, `@Previewable` or `#Preview`. On the macOS 27 SDK their plugins ship only with Xcode.
+Use `State(initialValue:)` storage instead (see `SceneCard` in `Gallery.swift`).
+
 By contributing, you agree that your work is released under the [MIT License](LICENSE).

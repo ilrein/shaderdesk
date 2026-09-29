@@ -242,7 +242,13 @@ struct SceneCard: View {
     let item: GalleryModel.Item
     let selected: Bool
     let action: () -> Void
-    @State private var hovering = false
+    // Plain State storage instead of `@State`: on the macOS 27 SDK `@State` is a macro whose plugin
+    // ships only with Xcode, so it fails to build with just the Command Line Tools.
+    private let hoverState = State(initialValue: false)
+    private var hovering: Bool {
+        get { hoverState.wrappedValue }
+        nonmutating set { hoverState.wrappedValue = newValue }
+    }
 
     var body: some View {
         Button(action: action) {
