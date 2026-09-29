@@ -118,6 +118,27 @@ enum Snapshot {
         let frameMs = times.sorted()[times.count / 2]
         _ = started
 
+        // --frames N [--fps F]: stream N raw BGRA frames (pw x ph) to stdout, advancing
+        // the scene clock from `time`, e.g. piped into
+        //   ffmpeg -f rawvideo -pix_fmt bgra -s WxH -r F -i - out.mp4
+        // (used by scripts/render-previews.sh for the website)
+        if let nStr = value(args, "--frames"), let frames = Int(nStr) {
+            let fps = Double(value(args, "--fps") ?? "30") ?? 30
+            var buf = [UInt8](repeating: 0, count: pw * ph * 4)
+            let out = FileHandle.standardOutput
+            for i in 0..<frames {
+                let world = model.advance(to: time + Double(i) / fps)
+                let cb3 = gpu.queue.makeCommandBuffer()!
+                renderer.encode(cb3, target: tex, world: world)
+                cb3.commit()
+                cb3.waitUntilCompleted()
+                tex.getBytes(&buf, bytesPerRow: pw * 4, from: MTLRegionMake2D(0, 0, pw, ph), mipmapLevel: 0)
+                buf.withUnsafeBytes { out.write(Data($0)) }
+            }
+            FileHandle.standardError.write("streamed \(frames) frames (\(pw)x\(ph) @ \(fps) fps)\n".data(using: .utf8)!)
+            return true
+        }
+
         var bytes = [UInt8](repeating: 0, count: pw * ph * 4)
         tex.getBytes(&bytes, bytesPerRow: pw * 4, from: MTLRegionMake2D(0, 0, pw, ph), mipmapLevel: 0)
         let cs = CGColorSpace(name: CGColorSpace.sRGB)!
