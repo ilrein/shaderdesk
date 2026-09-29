@@ -36,7 +36,7 @@ inline Sys sysFor(constant Uniforms& U) {
     s.db = s.da * 0.30;
     s.dtilt = -0.16;
     float2 dir = normalize(s.cc - s.dc);
-    s.tip = s.dc + dir * s.dr * 1.25;   // just inside DONOR_TIP
+    s.tip = s.dc + dir * s.dr * 0.99;   // leaves from the limb
     float c = cos(s.dtilt), sn = sin(s.dtilt);
     // lands on the near-left rim of the disk
     float2 rim = float2(-0.80 * s.da, -0.62 * s.db);
@@ -103,11 +103,10 @@ inline float2 bezierDist(float2 p, float2 a, float2 c, float2 b) {
     return float2(best * sg, bs);   // signed distance, curve parameter
 }
 
-// donor shape in units of its radius: a sphere, tidally stretched along A (the axis to
-// the companion) into a rounded teardrop. Approximate distance (Lipschitz < 1.25).
-constant float DONOR_TIP = 1.26;
+// donor shape in units of its radius. Physically it would be a Roche-lobe teardrop,
+// but that reads as a misshapen star, so it's kept round (a barely-there tidal bulge).
 inline float donorR(float c) {
-    return 1.0 + 0.06 * c * c + 0.20 * pow(saturate(c), 6.0);
+    return 1.0 + 0.015 * c * c;
 }
 inline float donorSDF(float3 p, float3 A) {
     float l = length(p);
@@ -142,7 +141,7 @@ fragment float4 scene_frame(VOut in [[stage_in]],
     float2 dirC = normalize(S.cc - S.dc);
     float3 A = float3(dirC, 0.0);
     float2 p2 = (pt - S.dc) / S.dr;
-    const float BOUND = 1.34;
+    const float BOUND = 1.03;
     float pr = dot(p2, p2);
     {
         // the outline of a surface of revolution about an in-plane axis is its profile,
