@@ -15,6 +15,7 @@ enum Preview {
     static func world(time: Double) -> World {
         var w = World()
         w.time = time
+        w.clock = time
         w.drift = SIMD2(Float(sin(time * 0.013) * 30), Float(sin(time * 0.009 + 1.3) * 20))
         w.act = 0.35
         w.brightness = Float(Settings.shared.brightness)
@@ -332,7 +333,7 @@ struct SettingsBar: View {
                 Text("Dim").tag(0.7); Text("Normal").tag(1.0); Text("Bright").tag(1.35)
             }
             .fixedSize()
-            Picker("Drift", selection: model.binding(\.driftSpeed)) {
+            Picker("Motion", selection: model.binding(\.driftSpeed)) {
                 Text("Still").tag(0.0); Text("Slow").tag(1.0); Text("Faster").tag(3.0)
             }
             .fixedSize()

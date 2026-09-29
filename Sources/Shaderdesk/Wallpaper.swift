@@ -207,7 +207,7 @@ final class WallpaperController {
     var scene: Scene {
         let wanted = scenes.first { $0.id == settings.scene }
         if let wanted, case .success = GPU.shared.pipelines(for: wanted) { return wanted }
-        return scenes.first { $0.id == "universe" } ?? scenes[0]
+        return scenes.first { $0.id == "redgiant" } ?? scenes[0]
     }
 
     /// Re-read scene files (built-in and user) and recompile on next frame.

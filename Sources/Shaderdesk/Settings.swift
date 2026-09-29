@@ -9,9 +9,9 @@ final class Settings {
 
     private init() {
         d.register(defaults: [
-            "scene": "universe",
-            "dataLayer": true,
-            "showCounters": true,
+            "scene": "redgiant",
+            "dataLayer": false,
+            "showCounters": false,
             "showLabels": true,
             "fps": 30,
             "brightness": 1.0,
@@ -22,7 +22,7 @@ final class Settings {
 
     /// scene id (file name without .metal); resolved against the catalog by the controller
     var scene: String {
-        get { d.string(forKey: "scene") ?? "universe" }
+        get { d.string(forKey: "scene") ?? "redgiant" }
         set { set(newValue, "scene") }
     }
     /// read agent activity from Claude Code / Codex logs

@@ -40,7 +40,7 @@ enum Snapshot {
     static func run(_ args: [String]) -> Bool {
         guard let out = value(args, "--snapshot") else { return false }
         let scenes = SceneCatalog.load()
-        let sceneID = value(args, "--scene") ?? "universe"
+        let sceneID = value(args, "--scene") ?? "redgiant"
         // --scene-file renders a .metal file outside the catalog (e.g. Art/Icon.metal)
         let adHoc = value(args, "--scene-file").map { path -> Scene in
             let url = URL(fileURLWithPath: path)

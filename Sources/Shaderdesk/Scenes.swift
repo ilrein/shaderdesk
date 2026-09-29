@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Metadata lives in `//!` comment lines at the top of the file:
 ///
-///     //! title: Distant Universe
+///     //! title: Red Giant
 ///     //! order: 0
 ///     //! labels: true      (draws project galaxies, so show their names)
 struct Scene: Equatable {

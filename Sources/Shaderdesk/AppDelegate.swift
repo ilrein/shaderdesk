@@ -115,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                              current: settings.fps, action: #selector(pickFPS(_:))))
         menu.addItem(submenu("Brightness", options: [("Dim", 0.7), ("Normal", 1.0), ("Bright", 1.35)],
                              current: settings.brightness, action: #selector(pickBrightness(_:))))
-        menu.addItem(submenu("Drift", options: [("Still", 0.0), ("Slow", 1.0), ("Faster", 3.0)],
+        menu.addItem(submenu("Motion", options: [("Still", 0.0), ("Slow", 1.0), ("Faster", 3.0)],
                              current: settings.driftSpeed, action: #selector(pickDrift(_:))))
         menu.addItem(toggle("Pause", settings.paused, #selector(togglePause)))
         menu.addItem(.separator())

@@ -1,8 +1,9 @@
 # Shaderdesk
 
-Live Metal shader wallpapers for macOS, from the menu bar. An optional data layer
-turns your coding agents' activity into the scene (Claude Code and Codex): each active
-project becomes a galaxy, and token throughput sets off flares.
+Live Metal shader wallpapers for macOS, from the menu bar. Built-in scenes:
+
+- **Red Giant**: a molten, boiling star with streaming corona rays, prominences rising
+  off the limb and a planet transiting in front of it.
 
 - **Native and light.** Swift + Metal, about 5% of one CPU core and a few ms of GPU per
   frame at full Retina resolution on two displays. The app is under 1 MB.
@@ -11,7 +12,8 @@ project becomes a galaxy, and token throughput sets off flares.
   everything stays in memory, so it resumes instantly without reloading.
 - **Pluggable scenes.** Each scene is a single `.metal` file compiled at runtime. Drop
   your own into a folder and it shows up in the menu.
-- **Private.** The data layer only reads local log files. Nothing leaves your machine.
+- **Private.** Nothing leaves your machine. The optional agent-activity layer (off by
+  default) only reads local Claude Code / Codex log files.
 
 ## Build
 
@@ -31,10 +33,9 @@ pause/resume events and per-display frame stats to stderr.
 | Item | |
 | --- | --- |
 | Scene | Pick a scene, open the scenes folder, reload (⌘R) |
-| Agent Activity | Data layer on/off. When off, scenes run in a calm ambient mode |
+| Agent Activity | Optional, off by default: exposes Claude Code / Codex activity to scenes |
 | Show Counters / Counters On | Projects · agents · tokens today, on the display you choose |
-| Show Project Names | Labels under project galaxies |
-| Frame Rate / Brightness / Drift | 15–60 fps, brightness, how fast the sky drifts |
+| Frame Rate / Brightness / Motion | 15–60 fps, brightness, how fast scenes move |
 | Pause / Launch at Login | |
 
 At the bottom of the menu, each display shows its resolution, fps and GPU time per frame.
@@ -80,7 +81,7 @@ Entry points:
 | --- | --- | --- |
 | `scene_frame` (required) | every frame | the display (sRGB) |
 | `scene_bake` (optional) | once per display and resize | `bg`, rgba16Float, covers the display plus a 56 pt margin for drift |
-| `scene_lut` (optional) | every frame, before `scene_frame` | `lut`, a (width × 8) rgba16Float texture. Put anything that depends only on x here (Aurora's curtains and ridgelines), so it's computed per column, not per pixel |
+| `scene_lut` (optional) | every frame, before `scene_frame` | `lut`, a (width × 8) rgba16Float texture. Put anything that depends only on x here, so it's computed per column, not per pixel |
 
 What's in `Uniforms` (see `Common.metal` for the full layout):
 

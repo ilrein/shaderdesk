@@ -4,7 +4,7 @@ import ServiceManagement
 let args = CommandLine.arguments
 if args.contains("--snapshot") {
     // Offscreen render to a PNG, e.g.
-    //   Shaderdesk --snapshot out.png --scene universe --size 1512x945 --scale 2 --time 40 --demo
+    //   Shaderdesk --snapshot out.png --scene redgiant --size 1512x945 --scale 2 --time 40 --demo
     let ok = MainActor.assumeIsolated { Snapshot.run(args) }
     exit(ok ? 0 : 1)
 }
