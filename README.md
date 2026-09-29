@@ -16,6 +16,9 @@ Live Metal shader wallpapers for macOS, from the menu bar. Built-in scenes:
 - **Rain City**: a cyberpunk skyline in the rain. Five layers of towers fading into haze,
   windows that come and go, flickering neon signs, blinking beacons, searchlights sweeping
   a city-lit cloud deck, and flying cars weaving between the towers.
+- **Abyss**: the deep ocean at the edge of the light. Bioluminescent jellyfish at several
+  depths swim upward in pulses, trailing rippling tentacles and frilled arms, while marine
+  snow sinks through faint light shafts from a surface far above.
 
 Every scene renders in HDR and goes through a shared bloom pass (a mip-pyramid lens
 glow) before tone mapping; set its strength per scene with `//! bloom: 0.06`. `//! tags: Stars, Planets` groups
