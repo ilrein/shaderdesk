@@ -20,7 +20,8 @@
 using namespace metal;
 
 struct Uniforms {
-    float4 target;   // global point (x, y) at the bottom-left of the render target; unused zw
+    float4 target;   // global point (x, y) at the bottom-left of the render target;
+                     // z = scene clock (seconds, scaled by the Motion speed setting, wraps daily); w unused
     float4 view;     // target size in px (x, y), px per point, time in seconds
     float4 bake;     // baked-background rect in global points: x, y, w, h
     float4 motion;   // sky drift x, y (points), activity 0..1, token pulse 0..1

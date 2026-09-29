@@ -90,7 +90,7 @@ final class Renderer {
 
     private func frameUniforms(target: MTLTexture, pxPerPt: Float, world: World) -> Uniforms {
         var u = baseUniforms(world: world)
-        u.target = SIMD4(Float(display.minX), Float(display.minY), 0, 0)
+        u.target = SIMD4(Float(display.minX), Float(display.minY), Float(world.clock.truncatingRemainder(dividingBy: 86_400)), 0)
         u.view = SIMD4(Float(target.width), Float(target.height), pxPerPt, Float(world.time))
         u.misc = SIMD4(world.brightness, Float(world.galaxies.count), Float(GPU.maxFlares), seed)
         return u

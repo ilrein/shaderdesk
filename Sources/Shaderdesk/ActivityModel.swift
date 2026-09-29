@@ -6,6 +6,7 @@ import simd
 struct World {
     var time: Double = 0
     var drift = SIMD2<Float>()
+    var clock: Double = 0   // scene clock: seconds scaled by the Motion speed setting
     var act: Float = 0
     var pulse: Float = 0
     var brightness: Float = 1
@@ -169,6 +170,7 @@ final class ActivityModel {
 
         camT += dt * speed
         world.time = time
+        world.clock = camT
         world.drift = SIMD2(Float(sin(camT * 0.013) * 30), Float(sin(camT * 0.009 + 1.3) * 20))
         world.act = act
         world.pulse = pulse
