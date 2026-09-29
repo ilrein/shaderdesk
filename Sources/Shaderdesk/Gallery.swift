@@ -153,20 +153,83 @@ enum AppActions {
 // MARK: - Views
 
 /// The whole UI: every scene as a big thumbnail. Click one and it's the wallpaper.
+/// Once scenes carry more than one tag, a sidebar filters them.
 struct PickerView: View {
     @ObservedObject var model: GalleryModel
-    private let columns = [GridItem(.fixed(CardSize.width), spacing: 14), GridItem(.fixed(CardSize.width), spacing: 14)]
+    @AppStorage("pickerTag") private var tag = ""   // "" = all
+    private let spacing: CGFloat = 14
+    private let maxRows = 3
+
+    private var tags: [String] {
+        var seen = Set<String>(), out: [String] = []
+        for t in model.items.flatMap(\.scene.tags) where seen.insert(t).inserted { out.append(t) }
+        return out.sorted()
+    }
+
+    private var shown: [GalleryModel.Item] {
+        guard !tag.isEmpty, tags.contains(tag) else { return model.items }
+        return model.items.filter { $0.scene.tags.contains(tag) }
+    }
 
     var body: some View {
-        LazyVGrid(columns: model.items.count > 1 ? columns : [columns[0]], spacing: 14) {
-            ForEach(model.items) { item in
-                SceneCard(item: item, selected: item.id == model.current) {
-                    if item.error == nil { model.select(item.scene) }
+        HStack(alignment: .top, spacing: 0) {
+            if tags.count > 1 {
+                sidebar
+                Divider()
+            }
+            grid
+        }
+        .fixedSize()
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            tagRow("All", key: "", count: model.items.count)
+            ForEach(tags, id: \.self) { t in
+                tagRow(t, key: t, count: model.items.filter { $0.scene.tags.contains(t) }.count)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(width: 150)
+        .frame(maxHeight: .infinity)
+    }
+
+    private func tagRow(_ title: String, key: String, count: Int) -> some View {
+        let on = (tags.contains(tag) ? tag : "") == key
+        return Button { tag = key } label: {
+            HStack {
+                Text(title).font(.system(size: 13, weight: on ? .semibold : .regular))
+                Spacer()
+                Text("\(count)").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 6).fill(on ? Color.accentColor.opacity(0.22) : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var grid: some View {
+        let items = shown
+        let cols = min(2, max(1, model.items.count))
+        // sized for all scenes, so switching tags doesn't resize the panel
+        let rows = min(maxRows, max(1, Int((Double(max(model.items.count, 1)) / Double(cols)).rounded(.up))))
+        let height = CGFloat(rows) * CardSize.height + CGFloat(rows - 1) * spacing + 32
+        let width = CGFloat(cols) * CardSize.width + CGFloat(cols - 1) * spacing + 32
+        return ScrollView(.vertical) {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(CardSize.width), spacing: spacing), count: cols),
+                      alignment: .leading, spacing: spacing) {
+                ForEach(items) { item in
+                    SceneCard(item: item, selected: item.id == model.current) {
+                        if item.error == nil { model.select(item.scene) }
+                    }
                 }
             }
+            .padding(16)
         }
-        .padding(16)
-        .fixedSize()
+        .scrollIndicators(.automatic)
+        .frame(width: width, height: height)
     }
 }
 

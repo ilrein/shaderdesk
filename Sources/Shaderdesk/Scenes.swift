@@ -10,12 +10,14 @@ import Foundation
 ///     //! order: 0
 ///     //! labels: true      (draws project galaxies, so show their names)
 ///     //! bloom: 0.06       (strength of the lens glow added in post; default 0.06)
+///     //! tags: Stars, Space (groups in the picker's sidebar)
 struct Scene: Equatable {
     let id: String
     let title: String
     let order: Int
     let showsLabels: Bool
     var bloom: Float = 0.06
+    var tags: [String] = []
     let url: URL
     let builtIn: Bool
 }
@@ -63,6 +65,8 @@ enum SceneCatalog {
                          order: Int(meta["order"] ?? "") ?? 100,
                          showsLabels: meta["labels"] == "true",
                          bloom: Float(meta["bloom"] ?? "") ?? 0.06,
+                         tags: (meta["tags"] ?? "").split(separator: ",")
+                             .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty },
                          url: url, builtIn: builtIn)
         }
     }

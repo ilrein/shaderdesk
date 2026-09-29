@@ -65,7 +65,7 @@ final class Renderer {
         let w = min(maxDim, Int((bakeRect.width * CGFloat(pxPerPt)).rounded(.up)))
         let h = min(maxDim, Int((bakeRect.height * CGFloat(pxPerPt)).rounded(.up)))
         if bakeTex?.width != w || bakeTex?.height != h {
-            let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: GPU.bakeFormat, width: w, height: h, mipmapped: false)
+            let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: GPU.bakeFormat, width: w, height: h, mipmapped: true)
             d.usage = [.renderTarget, .shaderRead]
             d.storageMode = .private
             bakeTex = gpu.device.makeTexture(descriptor: d)
@@ -87,6 +87,12 @@ final class Renderer {
         enc.setFragmentBytes(&u, length: MemoryLayout<Uniforms>.stride, index: 0)
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc.endEncoding()
+        // mips, so scenes can sample the bake minified (e.g. noise wrapped round a
+        // sphere) without aliasing: use a sampler with mip_filter::linear
+        if tex.mipmapLevelCount > 1, let blit = cb.makeBlitCommandEncoder() {
+            blit.generateMipmaps(for: tex)
+            blit.endEncoding()
+        }
         needsBake = false
         bakeScale = pxPerPt
     }

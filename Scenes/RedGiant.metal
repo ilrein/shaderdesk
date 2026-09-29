@@ -1,5 +1,6 @@
 //! title: Red Giant
 //! order: 3
+//! tags: Stars
 //
 // "Red Giant": a stylised, glowing red/orange star, one per display.
 //   bake  – rgb: three channels of seamlessly tiling fBm (read by the frame as a texture);
@@ -17,37 +18,6 @@
 // never accumulated shear, so it looks the same after hours as after seconds.
 
 constant float SPI = 3.14159265;
-constant float NOISE_CELLS = 24.0;
-
-inline float2 noiseTile(constant Uniforms& U) {
-    return float2(NOISE_CELLS, max(1.0, round(NOISE_CELLS * U.bake.w / U.bake.z)));
-}
-
-inline float pgnoise(float2 p, float2 P) {
-    float2 i = floor(p), f = fract(p);
-    float2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-    float2 i0 = i - P * floor(i / P), i1 = i0 + 1.0;
-    i1 -= P * floor(i1 / P);
-    float2 ga = hash22(i0) * 2.0 - 1.0;
-    float2 gb = hash22(float2(i1.x, i0.y)) * 2.0 - 1.0;
-    float2 gc = hash22(float2(i0.x, i1.y)) * 2.0 - 1.0;
-    float2 gd = hash22(i1) * 2.0 - 1.0;
-    float n = mix(mix(dot(ga, f), dot(gb, f - float2(1, 0)), u.x),
-                  mix(dot(gc, f - float2(0, 1)), dot(gd, f - float2(1, 1)), u.x), u.y);
-    return 0.5 + 0.85 * n;
-}
-
-inline float pfbm(float2 p, float2 P, int octaves) {
-    float s = 0.0, a = 0.5, norm = 0.0;
-    for (int i = 0; i < octaves; i++) {
-        s += a * pgnoise(p, P);
-        norm += a;
-        p *= 2.0; P *= 2.0;
-        a *= 0.5;
-    }
-    return s / norm;
-}
-
 struct StarFrame { float2 c; float R; };
 
 inline StarFrame starFor(constant Uniforms& U) {

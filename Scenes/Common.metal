@@ -148,6 +148,43 @@ inline float fbm1(float x, int octaves) {
     return s;
 }
 
+// ---- seamlessly tiling noise --------------------------------------------------------
+// Bake these into a scene's `bg` texture (see RedGiant/BlackHole): the frame then samples
+// it with address::repeat, so scrolling or wrapping it round a sphere never shows a seam.
+constant float NOISE_CELLS = 24.0;
+
+/// Noise-tile size in cells for a bake: 24 across, and as many down as keep cells square.
+inline float2 noiseTile(constant Uniforms& U) {
+    return float2(NOISE_CELLS, max(1.0, round(NOISE_CELLS * U.bake.w / U.bake.z)));
+}
+
+/// Gradient noise that repeats every P cells (0..1, mean 0.5).
+inline float pgnoise(float2 p, float2 P) {
+    float2 i = floor(p), f = fract(p);
+    float2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    float2 i0 = i - P * floor(i / P), i1 = i0 + 1.0;
+    i1 -= P * floor(i1 / P);
+    float2 ga = hash22(i0) * 2.0 - 1.0;
+    float2 gb = hash22(float2(i1.x, i0.y)) * 2.0 - 1.0;
+    float2 gc = hash22(float2(i0.x, i1.y)) * 2.0 - 1.0;
+    float2 gd = hash22(i1) * 2.0 - 1.0;
+    float n = mix(mix(dot(ga, f), dot(gb, f - float2(1, 0)), u.x),
+                  mix(dot(gc, f - float2(0, 1)), dot(gd, f - float2(1, 1)), u.x), u.y);
+    return 0.5 + 0.85 * n;
+}
+
+/// fBm of pgnoise; the period doubles with each octave's frequency, so it tiles too.
+inline float pfbm(float2 p, float2 P, int octaves) {
+    float s = 0.0, a = 0.5, norm = 0.0;
+    for (int i = 0; i < octaves; i++) {
+        s += a * pgnoise(p, P);
+        norm += a;
+        p *= 2.0; P *= 2.0;
+        a *= 0.5;
+    }
+    return s / norm;
+}
+
 // ---- colour ---------------------------------------------------------------------
 /// rough black-body tint: 0 = red dwarf ... 1 = blue giant
 inline float3 starColor(float t) {
