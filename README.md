@@ -13,6 +13,9 @@ Live Metal shader wallpapers for macOS, from the menu bar. Built-in scenes:
   the photon ring and the Einstein-ring sky come out of the physics.
 - **Neon Horizon**: synthwave in hot pink and cyan. A striped sun sinking between
   rim-lit mountain ridges, and a neon grid scrolling across a wet floor that mirrors it all.
+- **Rain City**: a cyberpunk skyline in the rain. Five layers of towers fading into haze,
+  windows that come and go, flickering neon signs, blinking beacons, searchlights sweeping
+  a city-lit cloud deck, and flying cars weaving between the towers.
 
 Every scene renders in HDR and goes through a shared bloom pass (a mip-pyramid lens
 glow) before tone mapping; set its strength per scene with `//! bloom: 0.06`. `//! tags: Stars, Planets` groups
