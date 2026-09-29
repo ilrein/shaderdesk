@@ -1,0 +1,114 @@
+# Shaderdesk
+
+Live Metal shader wallpapers for macOS, from the menu bar. An optional data layer
+turns your coding agents' activity into the scene (Claude Code and Codex): each active
+project becomes a galaxy, and token throughput sets off flares.
+
+- **Native and light.** Swift + Metal, about 5% of one CPU core and a few ms of GPU per
+  frame at full Retina resolution on two displays. The app is under 1 MB.
+- **No flicker.** One borderless window per display at the desktop level, on every
+  Space. When a display is covered (full-screen app, sleep, lock), drawing stops but
+  everything stays in memory, so it resumes instantly without reloading.
+- **Pluggable scenes.** Each scene is a single `.metal` file compiled at runtime. Drop
+  your own into a folder and it shows up in the menu.
+- **Private.** The data layer only reads local log files. Nothing leaves your machine.
+
+## Build
+
+Requires macOS 14+ and the Swift toolchain (Xcode or Command Line Tools). The Metal
+compiler isn't needed, because shaders compile at runtime.
+
+```sh
+scripts/build-app.sh            # -> build/Shaderdesk.app
+scripts/build-app.sh --install  # also copy to /Applications and launch
+```
+
+For development, run `swift run Shaderdesk`. Set `SHADERDESK_DEBUG=1` to log
+pause/resume events and per-display frame stats to stderr.
+
+## Menu
+
+| Item | |
+| --- | --- |
+| Scene | Pick a scene, open the scenes folder, reload (⌘R) |
+| Agent Activity | Data layer on/off. When off, scenes run in a calm ambient mode |
+| Show Counters / Counters On | Projects · agents · tokens today, on the display you choose |
+| Show Project Names | Labels under project galaxies |
+| Frame Rate / Brightness / Drift | 15–60 fps, brightness, how fast the sky drifts |
+| Pause / Launch at Login | |
+
+At the bottom of the menu, each display shows its resolution, fps and GPU time per frame.
+
+## Writing a scene
+
+Scenes live in two places:
+
+- built-in: `Scenes/` in this repo, copied into the app bundle
+- yours: `~/Library/Application Support/Shaderdesk/Scenes/`
+
+"Open Scenes Folder" in the menu opens your folder and copies the built-in scenes into
+`Examples/` for reference. A file in your folder with the same name as a built-in scene
+replaces it. The folder is watched, so saving a file reloads it.
+
+Each file is compiled on its own, with [`Scenes/Common.metal`](Scenes/Common.metal)
+prepended. That file provides the uniforms, noise, star helpers, tone mapping and
+dithering. If a scene fails to compile, it's marked in the menu with the error, and the
+other scenes keep working.
+
+```metal
+//! title: Plasma
+//! order: 10
+
+fragment float4 scene_frame(VOut in [[stage_in]],
+                            constant Uniforms& U [[buffer(0)]],
+                            constant Galaxy* G [[buffer(1)]],
+                            constant Flare* F [[buffer(2)]],
+                            texture2d<float> bg [[texture(0)]],
+                            texture2d<float> lut [[texture(1)]]) {
+    float2 p = globalPoint(in.pos, U) / 400.0;   // desktop points, continuous across displays
+    float t = U.view.w;                           // seconds
+    float act = U.motion.z;                       // agent activity 0..1 (smoothed)
+    float v = sin(p.x + t * 0.2) + sin(p.y * 1.3 - t * 0.15) + sin((p.x + p.y) * 0.7);
+    float3 col = 0.02 + 0.03 * (0.5 + 0.5 * cos(v + float3(0, 2, 4))) * (1.0 + act);
+    return present(col * U.misc.x, in.pos.xy);   // tone-map + dither for the display
+}
+```
+
+Entry points:
+
+| Function | When | Output |
+| --- | --- | --- |
+| `scene_frame` (required) | every frame | the display (sRGB) |
+| `scene_bake` (optional) | once per display and resize | `bg`, rgba16Float, covers the display plus a 56 pt margin for drift |
+| `scene_lut` (optional) | every frame, before `scene_frame` | `lut`, a (width × 8) rgba16Float texture. Put anything that depends only on x here (Aurora's curtains and ridgelines), so it's computed per column, not per pixel |
+
+What's in `Uniforms` (see `Common.metal` for the full layout):
+
+- `view`: target size in px, px per point, time
+- `motion`: drift, activity, token pulse
+- `misc`: brightness, galaxy count, flare count, per-display seed
+- `display` and `desk`: this display's rect and the whole desktop's, in global points
+
+`G` holds up to 8 project galaxies (position, size, look, tint). `F` holds 16 flares
+(position, start time, size, colour).
+
+Tips: keep per-pixel work in `scene_frame` small, and move anything static into
+`scene_bake`. Use `Shaderdesk --snapshot out.png --scene <id> --demo --bench 60` to
+render a PNG offscreen and print the median GPU time per frame.
+
+## Data layer
+
+Read incrementally every 2 s, from the local logs only:
+
+- **Claude Code**: `~/.claude/projects/**/*.jsonl`. Assistant `message.usage`, deduped by message id.
+- **Codex**: `~/.codex/{sessions,archived_sessions}/**/*.jsonl`. `token_usage_record`,
+  deduped by response id, falling back to `token_count` for older logs.
+- **Agent processes**: counted by name (claude, codex, aider, gemini, opencode, …).
+
+A session counts as *working* if its log changed in the last 25 s. A project counts as
+*active* if any of its sessions changed in the last 15 minutes. Token totals include
+cache reads and writes, and reset at local midnight.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
