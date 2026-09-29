@@ -41,7 +41,13 @@ enum Snapshot {
         guard let out = value(args, "--snapshot") else { return false }
         let scenes = SceneCatalog.load()
         let sceneID = value(args, "--scene") ?? "universe"
-        guard let scene = scenes.first(where: { $0.id == sceneID }) else {
+        // --scene-file renders a .metal file outside the catalog (e.g. Art/Icon.metal)
+        let adHoc = value(args, "--scene-file").map { path -> Scene in
+            let url = URL(fileURLWithPath: path)
+            return Scene(id: url.deletingPathExtension().lastPathComponent.lowercased(), title: "adhoc",
+                         order: 0, showsLabels: false, url: url, builtIn: false)
+        }
+        guard let scene = adHoc ?? scenes.first(where: { $0.id == sceneID }) else {
             print("unknown scene \(sceneID); have: \(scenes.map(\.id).joined(separator: ", "))")
             return false
         }

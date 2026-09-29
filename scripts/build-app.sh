@@ -11,6 +11,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Scenes"
 cp .build/release/Shaderdesk "$APP/Contents/MacOS/Shaderdesk"
 cp Scenes/*.metal "$APP/Contents/Resources/Scenes/"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"   # regenerate with scripts/make-icon.sh
 
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -20,6 +21,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleName</key><string>Shaderdesk</string>
   <key>CFBundleDisplayName</key><string>Shaderdesk</string>
   <key>CFBundleIdentifier</key><string>com.ilrein.shaderdesk</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleExecutable</key><string>Shaderdesk</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
