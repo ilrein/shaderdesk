@@ -4,6 +4,9 @@ Live Metal shader wallpapers for macOS, from the menu bar. Built-in scenes:
 
 - **Red Giant**: a molten, boiling star with streaming corona rays, prominences rising
   off the limb and a planet transiting in front of it.
+- **Eclipse**: a total solar eclipse over a mountain ridge. A pearly corona with field-bent
+  rays, helmet streamers and polar plumes; pink prominences at the Moon's edge; and every few
+  minutes Baily's beads flash into a diamond ring that briefly lights up the twilight sky.
 - **Ringed World**: a banded gas giant backlit by its star, with rings that cast
   shadows on it (and catch its shadow), ice glints, and a moon that slips into eclipse.
 - **Binary**: an amber giant spilling a stream of gas onto a
